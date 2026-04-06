@@ -6,16 +6,16 @@
     <title>Arts &amp; Culture</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: system-ui, -apple-system, sans-serif; background: #0d0d0d; color: #e8e8e8; }
+      body { font-family: system-ui, -apple-system, sans-serif; background: #0d0d0d; color: #e8e8e8; overflow-x: hidden; }
       #app { min-height: 100vh; }
 
       /* Header */
-      .header { position: sticky; top: 0; z-index: 10; background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #222; }
+      .header { position: sticky; top: 0; z-index: 10; background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #222; flex-wrap: wrap; }
       .header h1 { font-size: 1.1rem; font-weight: 700; color: #e8e8e8; white-space: nowrap; flex-shrink: 0; }
 
       /* Search bar */
-      .search-bar { display: flex; gap: 8px; flex: 1; max-width: 480px; }
-      .search-bar input { flex: 1; padding: 9px 14px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; font-size: 0.9rem; font-family: inherit; outline: none; transition: border-color 0.15s; }
+      .search-bar { display: flex; gap: 8px; flex: 1; min-width: 200px; max-width: 480px; }
+      .search-bar input { flex: 1; min-width: 0; padding: 9px 14px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; font-size: 0.9rem; font-family: inherit; outline: none; transition: border-color 0.15s; }
       .search-bar input:focus { border-color: #7c7cff; }
       .search-bar input::placeholder { color: #555; }
       .search-bar button { padding: 9px 18px; background: #7c7cff; color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
@@ -69,7 +69,7 @@
   </head>
   <body>
     <div id="app"></div>
-    <div class="status-bar" id="status">Bridge: waiting for host...</div>
+    <div class="status-bar" id="status">Art Institute of Chicago · Public Domain Collection</div>
 
     <script>
       // -- State -------------------------------------------------------
@@ -330,7 +330,8 @@
         // Grid view
         var cardsHtml = '';
         if (state.artworks.length === 0) {
-          cardsHtml = '<div class="empty-state">No artworks found.</div>';
+          var emptyMsg = state.query ? 'No artworks found for \u201c' + escHtml(state.query) + '\u201d.' : 'No artworks to display.';
+          cardsHtml = '<div class="empty-state">' + emptyMsg + '</div>';
         } else {
           cardsHtml = '<div class="grid">' +
             state.artworks.map(function (a) {

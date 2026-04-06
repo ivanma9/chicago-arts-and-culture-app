@@ -167,6 +167,13 @@
             notifyResize();
             break;
 
+          case "host:tool-result":
+            if (msg.payload && msg.payload.toolName === "search_artworks" && msg.payload.result) {
+              var query = msg.payload.result.query;
+              if (query) searchArtworks(query, 1);
+            }
+            break;
+
           case "host:request-complete":
             sendComplete();
             break;

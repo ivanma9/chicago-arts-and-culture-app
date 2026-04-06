@@ -7,5 +7,20 @@
   "origin": "https://googleartcult.vercel.app",
   "permissions": ["session:write"],
   "scopes": [],
-  "tools": []
+  "tools": [
+    {
+      "name": "search_artworks",
+      "description": "Search for public domain artworks in the Art Institute of Chicago collection",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search term, e.g. 'Monet', 'impressionism', 'portrait'"
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
 }

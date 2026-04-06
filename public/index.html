@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arts &amp; Culture</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, -apple-system, sans-serif; background: #0d0d0d; color: #e8e8e8; }
+      #app { min-height: 100vh; }
+
+      /* Status bar */
+      .status-bar { padding: 6px 16px; background: #1a1a1a; border-top: 1px solid #222; font-size: 0.72rem; color: #555; }
+      .status-bar .event { color: #7c7cff; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div class="status-bar" id="status">Bridge: waiting for host...</div>
+
+    <script>
+      // -- State -------------------------------------------------------
+      let state = {
+        query: '',
+        artworks: [],
+        detail: null,
+        page: 1,
+        totalPages: 0,
+        loading: false,
+        error: null,
+      };
+
+      // -- Bridge variables --------------------------------------------
+      let hostOrigin = null;
+      let appSessionId = null;
+      let messageNonce = null;
+      var isStandalone = (window.parent === window);
+      var protocolVersion = "1";
+
+      // -- Bridge helpers ----------------------------------------------
+      function send(event) {
+        if (window.parent !== window && hostOrigin && appSessionId && messageNonce) {
+          window.parent.postMessage({
+            protocolVersion: protocolVersion,
+            appSessionId: appSessionId,
+            nonce: messageNonce,
+            event: event
+          }, hostOrigin);
+        }
+        log("\u2191 " + event.type);
+      }
+
+      function log(msg) {
+        var el = document.getElementById("status");
+        el.innerHTML = 'Bridge: <span class="event">' + escHtml(msg) + '</span>';
+      }
+
+      function escHtml(str) {
+        var d = document.createElement("div");
+        d.textContent = str || "";
+        return d.innerHTML;
+      }
+
+      function notifyResize() {
+        var height = document.documentElement.scrollHeight;
+        send({ type: "app:resize", payload: { height: height } });
+      }
+
+      function saveState() {
+        send({ type: "app:save-state", payload: { state: {
+          query: state.query,
+          artworks: state.artworks,
+          detail: state.detail,
+          page: state.page,
+          totalPages: state.totalPages,
+        } } });
+      }
+
+      // -- Bridge listener ---------------------------------------------
+      window.addEventListener("message", function (e) {
+        var envelope = e.data;
+        if (!envelope || envelope.protocolVersion !== protocolVersion || !envelope.event || !envelope.nonce) return;
+
+        var msg = envelope.event;
+        if (!msg || !msg.type) return;
+
+        log("\u2193 " + msg.type);
+
+        switch (msg.type) {
+          case "host:init":
+            hostOrigin = e.origin;
+            appSessionId = envelope.appSessionId;
+            messageNonce = envelope.nonce;
+            send({ type: "app:ready", payload: { appId: "arts-culture", version: "0.1.0" } });
+            loadFeatured();
+            break;
+
+          case "host:resume-session":
+            hostOrigin = e.origin;
+            appSessionId = envelope.appSessionId;
+            messageNonce = envelope.nonce;
+            if (msg.payload && msg.payload.state) {
+              var s = msg.payload.state;
+              state.query = s.query || '';
+              state.artworks = s.artworks || [];
+              state.detail = s.detail || null;
+              state.page = s.page || 1;
+              state.totalPages = s.totalPages || 0;
+              state.loading = false;
+              state.error = null;
+            }
+            send({ type: "app:ready", payload: { appId: "arts-culture", version: "0.1.0" } });
+            render();
+            notifyResize();
+            break;
+
+          case "host:request-complete":
+            sendComplete();
+            break;
+
+          default:
+            break;
+        }
+      });
+
+      function sendComplete() {
+        var summary;
+        if (state.detail) {
+          summary = "Viewing " + state.detail.title + (state.detail.artist_title ? " by " + state.detail.artist_title : "");
+        } else if (state.query) {
+          summary = "Browsing " + state.artworks.length + " results for '" + state.query + "'";
+        } else {
+          summary = "Browsing featured artworks";
+        }
+        send({ type: "app:complete", payload: { summary: summary } });
+      }
+
+      // -- Render ------------------------------------------------------
+      function render() {
+        var root = document.getElementById("app");
+        root.innerHTML = '<h1 style="padding:24px;color:#e8e8e8;">Arts &amp; Culture</h1>';
+      }
+
+      // -- Initial render ----------------------------------------------
+      render();
+    </script>
+  </body>
+</html>

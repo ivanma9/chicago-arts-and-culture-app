@@ -1,0 +1,11 @@
+{
+  "id": "arts-culture",
+  "version": "0.1.0",
+  "name": "Arts & Culture",
+  "description": "Browse public domain artworks from the Art Institute of Chicago.",
+  "entryUrl": "http://localhost:3205",
+  "origin": "http://localhost:3205",
+  "permissions": ["session:write"],
+  "scopes": [],
+  "tools": []
+}

@@ -9,9 +9,18 @@
   "scopes": [],
   "tools": [
     {
+      "name": "launch_arts_culture",
+      "description": "Open the Arts & Culture explorer to browse public domain artworks from the Art Institute of Chicago.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
       "name": "search_artworks",
       "description": "Search for public domain artworks in the Art Institute of Chicago collection. All parameters are optional — combine freely.",
-      "parameters": {
+      "inputSchema": {
         "type": "object",
         "properties": {
           "query": {

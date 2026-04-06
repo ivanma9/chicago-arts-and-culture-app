@@ -176,7 +176,9 @@
             break;
 
           case "host:tool-result":
-            if (msg.payload && msg.payload.toolName === "search_artworks" && msg.payload.result) {
+            if (msg.payload && msg.payload.toolName === "launch_arts_culture") {
+              loadFeatured();
+            } else if (msg.payload && msg.payload.toolName === "search_artworks" && msg.payload.result) {
               var r = msg.payload.result;
               var toolFilters = {};
               if (r.date_start !== undefined) toolFilters.date_start = r.date_start;

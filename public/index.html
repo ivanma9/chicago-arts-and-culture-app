@@ -36,6 +36,11 @@
       .load-more { padding: 10px 28px; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; }
       .load-more:hover { background: #2a2a2a; }
 
+      /* Active filters */
+      .filter-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px 0; }
+      .filter-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #1e1e3a; border: 1px solid #4a4aaa; border-radius: 20px; font-size: 0.75rem; color: #a0a0ff; }
+      .filter-pill .pill-label { color: #666; }
+
       /* Empty state */
       .empty-state { text-align: center; padding: 60px 20px; color: #555; }
 
@@ -75,6 +80,7 @@
       // -- State -------------------------------------------------------
       let state = {
         query: '',
+        filters: {},
         artworks: [],
         detail: null,
         page: 1,
@@ -122,6 +128,7 @@
       function saveState() {
         send({ type: "app:save-state", payload: { state: {
           query: state.query,
+          filters: state.filters,
           artworks: state.artworks,
           detail: state.detail,
           page: state.page,
@@ -155,6 +162,7 @@
             if (msg.payload && msg.payload.state) {
               var s = msg.payload.state;
               state.query = s.query || '';
+              state.filters = s.filters || {};
               state.artworks = s.artworks || [];
               state.detail = s.detail || null;
               state.page = s.page || 1;
@@ -169,8 +177,17 @@
 
           case "host:tool-result":
             if (msg.payload && msg.payload.toolName === "search_artworks" && msg.payload.result) {
-              var query = msg.payload.result.query;
-              if (query) searchArtworks(query, 1);
+              var r = msg.payload.result;
+              var toolFilters = {};
+              if (r.date_start !== undefined) toolFilters.date_start = r.date_start;
+              if (r.date_end !== undefined) toolFilters.date_end = r.date_end;
+              if (r.medium) toolFilters.medium = r.medium;
+              if (r.classification) toolFilters.classification = r.classification;
+              if (r.place_of_origin) toolFilters.place_of_origin = r.place_of_origin;
+              if (r.artist) toolFilters.artist = r.artist;
+              if (r.department) toolFilters.department = r.department;
+              if (r.style) toolFilters.style = r.style;
+              searchArtworks(r.query || '', 1, toolFilters);
             }
             break;
 
@@ -204,24 +221,48 @@
         return "https://www.artic.edu/iiif/2/" + imageId + "/full/843,/0/default.jpg";
       }
 
-      async function searchArtworks(query, page) {
+      async function searchArtworks(query, page, filters) {
+        filters = filters || state.filters || {};
         state.loading = true;
         state.error = null;
         state.query = query;
+        state.filters = filters;
         render();
         try {
-          var url = "https://api.artic.edu/api/v1/artworks/search?q=" + encodeURIComponent(query) +
-            "&page=" + page + "&limit=20" +
-            "&fields=id,title,artist_title,date_display,image_id" +
-            "&query[term][is_public_domain]=true";
-          var res = await fetch(url);
+          var filterClauses = [{ term: { is_public_domain: true } }];
+          var mustClauses = [];
+          if (filters.date_start !== undefined) filterClauses.push({ range: { date_start: { gte: filters.date_start } } });
+          if (filters.date_end !== undefined) filterClauses.push({ range: { date_end: { lte: filters.date_end } } });
+          if (filters.medium) mustClauses.push({ match: { medium_display: filters.medium } });
+          if (filters.classification) mustClauses.push({ match: { classification_title: filters.classification } });
+          if (filters.place_of_origin) mustClauses.push({ match: { place_of_origin: filters.place_of_origin } });
+          if (filters.artist) mustClauses.push({ match: { artist_title: filters.artist } });
+          if (filters.department) mustClauses.push({ match: { department_title: filters.department } });
+          if (filters.style) mustClauses.push({ match: { style_title: filters.style } });
+
+          var boolQuery = { filter: filterClauses };
+          if (mustClauses.length > 0) boolQuery.must = mustClauses;
+
+          var body = {
+            fields: 'id,title,artist_title,date_display,image_id',
+            limit: 20,
+            page: page,
+            query: { bool: boolQuery },
+          };
+          if (query) body.q = query;
+
+          var res = await fetch('https://api.artic.edu/api/v1/artworks/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
           if (!res.ok) throw new Error("Search request failed");
           var data = await res.json();
-          var filtered = (data.data || []).filter(function (a) { return a.image_id; });
+          var results = (data.data || []).filter(function (a) { return a.image_id; });
           if (page === 1) {
-            state.artworks = filtered;
+            state.artworks = results;
           } else {
-            state.artworks = state.artworks.concat(filtered);
+            state.artworks = state.artworks.concat(results);
           }
           state.page = page;
           state.totalPages = (data.pagination && data.pagination.total_pages) ? data.pagination.total_pages : 1;
@@ -260,6 +301,7 @@
         state.loading = true;
         state.error = null;
         state.query = '';
+        state.filters = {};
         render();
         try {
           var url = "https://api.artic.edu/api/v1/artworks/search?q=&limit=20" +
@@ -361,6 +403,7 @@
 
         root.innerHTML =
           '<div class="header"><h1>Arts &amp; Culture</h1>' + searchBarHtml() + '</div>' +
+          filterPillsHtml() +
           '<div class="grid-container">' + cardsHtml + loadMoreHtml + '</div>';
 
         // Bind card clicks
@@ -374,11 +417,23 @@
         var loadMoreBtn = document.getElementById('load-more-btn');
         if (loadMoreBtn) {
           loadMoreBtn.addEventListener('click', function () {
-            searchArtworks(state.query, state.page + 1);
+            searchArtworks(state.query, state.page + 1, state.filters);
           });
         }
 
         bindSearch();
+      }
+
+      function filterPillsHtml() {
+        var f = state.filters || {};
+        var pills = [];
+        var labels = { date_start: 'From', date_end: 'To', medium: 'Medium', classification: 'Type', place_of_origin: 'Origin', artist: 'Artist', department: 'Dept', style: 'Style' };
+        Object.keys(labels).forEach(function (k) {
+          if (f[k] !== undefined && f[k] !== '') {
+            pills.push('<span class="filter-pill"><span class="pill-label">' + labels[k] + '</span> ' + escHtml(String(f[k])) + '</span>');
+          }
+        });
+        return pills.length ? '<div class="filter-pills">' + pills.join('') + '</div>' : '';
       }
 
       function searchBarHtml() {
